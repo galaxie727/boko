@@ -453,7 +453,7 @@ html,body{
       第${stage}面 / ${STAGES}面<br>
       今の面: ${stageKills}/${PER_STAGE}体 撃破　総撃破: ${killedTotal}/${ENEMY_TOTAL}<br>
       味方: ${alive}体　敵残り: ${enemiesRemain}体　選択中: ${sel ? iconForUnit(sel) : "-"}<br>
-      <span class="small">先頭を動かすと後ろが自動追従</span>
+      <span class="small">選択中キャラを中心に他の仲間がゆるく追従</span>
     `;
     partyEl.innerHTML = party.map((u, i) => {
       const mark = u.alive && i === selectedIndex ? "▶ " : "";
@@ -529,11 +529,12 @@ html,body{
   }
 
   function followAI(){
-    const alive = party.filter(u => u.alive);
-    for (let i = 1; i < alive.length; i++){
-      const leader = alive[i - 1];
-      const follower = alive[i];
-      const desired = formationOffset(follower);
+    const leader = selectedUnit();
+    if (!leader) return;
+
+    const followers = party.filter(u => u.alive && u.id !== leader.id);
+    followers.forEach((follower, idx) => {
+      const desired = formationOffset(follower) + (idx % 2 === 0 ? 10 : 22);
       const dx = leader.x - follower.x;
       const dy = leader.y - follower.y;
       const dist = Math.hypot(dx, dy);
@@ -547,7 +548,7 @@ html,body{
         follower.x = clamp(follower.x, PAD, maxX());
         follower.y = clamp(follower.y, TOP_LIMIT, maxY());
       }
-    }
+    });
   }
 
   function processAfterMove(unit){
