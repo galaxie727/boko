@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<title>ボコスカ風ステージ試作</title>
+<title>ボコスカ風ステージ試作 v2</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{
@@ -70,6 +70,7 @@ html,body{
 #controls{
   display:flex;
   justify-content:center;
+  flex-wrap:wrap;
   gap:10px;
   pointer-events:auto;
 }
@@ -106,9 +107,7 @@ html,body{
 .unit.archer{background:#10b981;}
 .unit.shield{background:#8b5cf6;}
 .unit.king{background:#f59e0b;color:#2b1700;}
-.enemy{
-  background:#ef4444;
-}
+.enemy{background:#ef4444;}
 .enemy.enemyArcher{background:#d946ef;}
 .enemy.enemyBoss{background:#b91c1c;}
 .rescue{
@@ -211,25 +210,7 @@ html,body{
   50%{box-shadow:0 0 26px rgba(239,68,68,.9)}
   100%{box-shadow:0 0 0 rgba(239,68,68,0)}
 }
-#tapGuide{
-  position:absolute;
-  inset:0;
-  z-index:5;
-}
-#tapGuide .zone{
-  position:absolute;
-}
-#tapGuide .up{left:20%;right:20%;top:0;height:28%}
-#tapGuide .down{left:20%;right:20%;bottom:0;height:28%}
-#tapGuide .left{left:0;top:22%;bottom:22%;width:28%}
-#tapGuide .right{right:0;top:22%;bottom:22%;width:28%}
-#tapGuide .center{
-  left:28%;right:28%;top:28%;bottom:28%;
-}
-.small{
-  opacity:.85;
-  font-size:12px;
-}
+.small{opacity:.85;font-size:12px}
 </style>
 </head>
 <body>
@@ -248,14 +229,6 @@ html,body{
       </div>
       <div id="battleText">…</div>
     </div>
-  </div>
-
-  <div id="tapGuide">
-    <div class="zone up"></div>
-    <div class="zone down"></div>
-    <div class="zone left"></div>
-    <div class="zone right"></div>
-    <div class="zone center"></div>
   </div>
 
   <div id="bottomUi">
@@ -290,6 +263,7 @@ html,body{
   const ENEMY_TOTAL = 100;
   const STAGES = 10;
   const PER_STAGE = 10;
+  const FOLLOW_DISTANCE = 56;
 
   let isBattling = false;
   let stage = 1;
@@ -298,10 +272,10 @@ html,body{
   let rescueCounter = 0;
 
   const party = [
-    { id:"king", type:"king", label:"王", icon:"王", x:40,  y:520, power:20, wins:0, alive:true, debuff:0 },
-    { id:"m1",   type:"melee", label:"兵", icon:"兵", x:108, y:520, power:12, wins:0, alive:true, debuff:0 },
-    { id:"a1",   type:"archer",label:"弓", icon:"弓", x:176, y:520, power:8,  wins:0, alive:true, debuff:0 },
-    { id:"s1",   type:"shield",label:"盾", icon:"盾", x:244, y:520, power:10, wins:0, alive:true, debuff:0 }
+    { id:"king", type:"king", label:"王", icon:"王", x:40,  y:520, power:20, wins:0, alive:true, debuff:0, el:null },
+    { id:"m1",   type:"melee", label:"兵", icon:"兵", x:108, y:520, power:12, wins:0, alive:true, debuff:0, el:null },
+    { id:"a1",   type:"archer",label:"弓", icon:"弓", x:176, y:520, power:8,  wins:0, alive:true, debuff:0, el:null },
+    { id:"s1",   type:"shield",label:"盾", icon:"盾", x:244, y:520, power:10, wins:0, alive:true, debuff:0, el:null }
   ];
   let selectedIndex = 0;
   let enemies = [];
@@ -311,6 +285,9 @@ html,body{
   function maxY(){ return app.clientHeight - SIZE - BOTTOM_LIMIT_PAD; }
   function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
   function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+  function distance(a,b){
+    return Math.hypot((a.x + SIZE/2) - (b.x + SIZE/2), (a.y + SIZE/2) - (b.y + SIZE/2));
+  }
 
   function livingParty(){ return party.filter(u=>u.alive); }
   function selectedUnit(){ ensureSelectedAlive(); return party[selectedIndex]; }
@@ -352,7 +329,6 @@ html,body{
         y: randInt(TOP_LIMIT, maxY() - 120),
         alive: true,
         debuff: 0,
-        archerShotDone: false,
         el: null
       };
       enemies.push(enemy);
@@ -402,8 +378,10 @@ html,body{
       el.className = `unit ${u.type}`;
       u.el = el;
       app.appendChild(el);
+
       el.addEventListener("click", ev => {
         ev.stopPropagation();
+        ev.preventDefault();
         const idx = party.findIndex(p=>p.id===u.id);
         if (idx >= 0 && u.alive) {
           selectedIndex = idx;
@@ -411,7 +389,17 @@ html,body{
           log(`${iconForUnit(u)}を選択`);
         }
       });
-      el.addEventListener("touchstart", ev => ev.stopPropagation(), {passive:true});
+
+      el.addEventListener("touchend", ev => {
+        ev.stopPropagation();
+        ev.preventDefault();
+        const idx = party.findIndex(p=>p.id===u.id);
+        if (idx >= 0 && u.alive) {
+          selectedIndex = idx;
+          renderAll();
+          log(`${iconForUnit(u)}を選択`);
+        }
+      }, {passive:false});
     }
     el.textContent = iconForUnit(u);
     el.style.left = `${u.x}px`;
@@ -464,7 +452,8 @@ html,body{
     stageInfoEl.innerHTML = `
       第${stage}面 / ${STAGES}面<br>
       今の面: ${stageKills}/${PER_STAGE}体 撃破　総撃破: ${killedTotal}/${ENEMY_TOTAL}<br>
-      味方: ${alive}体　敵残り: ${enemiesRemain}体　選択中: ${sel ? iconForUnit(sel) : "-"}
+      味方: ${alive}体　敵残り: ${enemiesRemain}体　選択中: ${sel ? iconForUnit(sel) : "-"}<br>
+      <span class="small">先頭を動かすと後ろが自動追従</span>
     `;
     partyEl.innerHTML = party.map((u, i) => {
       const mark = u.alive && i === selectedIndex ? "▶ " : "";
@@ -487,7 +476,15 @@ html,body{
   }
 
   ctrlBtns.forEach(btn => {
-    btn.addEventListener("click", () => selectByIndex(Number(btn.dataset.index)));
+    btn.addEventListener("click", ev => {
+      ev.stopPropagation();
+      selectByIndex(Number(btn.dataset.index));
+    });
+    btn.addEventListener("touchend", ev => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      selectByIndex(Number(btn.dataset.index));
+    }, {passive:false});
   });
 
   function moveSelectedByTap(clientX, clientY){
@@ -500,7 +497,6 @@ html,body{
     const dx = clientX - cx;
     const dy = clientY - cy;
     const deadZone = 26;
-    let moved = false;
 
     if (Math.abs(dx) < deadZone && Math.abs(dy) < deadZone) return;
 
@@ -511,35 +507,68 @@ html,body{
     }
     u.x = clamp(u.x, PAD, maxX());
     u.y = clamp(u.y, TOP_LIMIT, maxY());
-    moved = true;
 
-    if (moved) {
-      if (u.el){
-        u.el.classList.remove("hit");
-        void u.el.offsetWidth;
-        u.el.classList.add("hit");
-        setTimeout(() => u.el && u.el.classList.remove("hit"), 120);
-      }
-      renderAll();
-      processAfterMove(u);
-    }
+    flash(u);
+    followAI();
+    renderAll();
+    processAfterMove(u);
   }
 
-  function distance(a,b){
-    return Math.hypot((a.x + SIZE/2) - (b.x + SIZE/2), (a.y + SIZE/2) - (b.y + SIZE/2));
+  function flash(u){
+    if (!u.el) return;
+    u.el.classList.remove("hit");
+    void u.el.offsetWidth;
+    u.el.classList.add("hit");
+    setTimeout(() => u.el && u.el.classList.remove("hit"), 120);
+  }
+
+  function formationOffset(unit){
+    if (unit.type === "archer") return STEP * 1.4;
+    if (unit.type === "shield") return STEP * 1.1;
+    return STEP;
+  }
+
+  function followAI(){
+    const alive = party.filter(u => u.alive);
+    for (let i = 1; i < alive.length; i++){
+      const leader = alive[i - 1];
+      const follower = alive[i];
+      const desired = formationOffset(follower);
+      const dx = leader.x - follower.x;
+      const dy = leader.y - follower.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > desired){
+        if (Math.abs(dx) > Math.abs(dy)){
+          follower.x += dx > 0 ? STEP : -STEP;
+        } else {
+          follower.y += dy > 0 ? STEP : -STEP;
+        }
+        follower.x = clamp(follower.x, PAD, maxX());
+        follower.y = clamp(follower.y, TOP_LIMIT, maxY());
+      }
+    }
   }
 
   function processAfterMove(unit){
     checkRescue(unit);
     applyFriendlyArcherShots();
     applyEnemyArcherShots();
-    const target = enemies.find(e => e.alive && distance(unit,e) < 48);
-    if (target){
-      battle(unit, target);
+
+    const contactTarget = nearestContactEnemy(unit);
+    if (contactTarget){
+      battle(unit, contactTarget);
       return;
     }
+
+    const followerFight = firstFollowerBattle();
+    if (followerFight){
+      battle(followerFight.unit, followerFight.enemy);
+      return;
+    }
+
     renderAll();
-    const nearby = nearestEnemy();
+    const nearby = nearestEnemy(unit);
     if (nearby) {
       const pct = calcChance(unit, nearby).percent;
       log(`敵接近中 勝率 ${pct}%`);
@@ -548,8 +577,8 @@ html,body{
     }
   }
 
-  function nearestEnemy(){
-    const u = selectedUnit();
+  function nearestEnemy(fromUnit){
+    const u = fromUnit || selectedUnit();
     if (!u) return null;
     let best = null, bestD = Infinity;
     enemies.filter(e=>e.alive).forEach(e => {
@@ -557,6 +586,19 @@ html,body{
       if (d < bestD){ bestD = d; best = e; }
     });
     return best;
+  }
+
+  function nearestContactEnemy(unit){
+    return enemies.find(e => e.alive && distance(unit,e) < 48);
+  }
+
+  function firstFollowerBattle(){
+    const alive = party.filter(u => u.alive);
+    for (const unit of alive){
+      const enemy = nearestContactEnemy(unit);
+      if (enemy) return { unit, enemy };
+    }
+    return null;
   }
 
   function checkRescue(unit){
@@ -592,9 +634,19 @@ html,body{
     btn.className = "ctrlBtn";
     btn.dataset.index = String(party.length - 1);
     btn.textContent = label;
-    btn.addEventListener("click", () => selectByIndex(Number(btn.dataset.index)));
+    btn.addEventListener("click", ev => {
+      ev.stopPropagation();
+      selectByIndex(Number(btn.dataset.index));
+    });
+    btn.addEventListener("touchend", ev => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      selectByIndex(Number(btn.dataset.index));
+    }, {passive:false});
     document.getElementById("controls").appendChild(btn);
     ctrlBtns.push(btn);
+
+    followAI();
     renderAll();
   }
 
@@ -624,7 +676,6 @@ html,body{
 
     if (player.type === "shield") e -= 3;
     if (nearKing(player)) p += 2;
-
     p += (livingParty().length - 1) * 0.03;
 
     p = Math.max(1, p);
@@ -642,7 +693,7 @@ html,body{
   }
 
   function battle(player, enemy){
-    if (isBattling) return;
+    if (isBattling || !player.alive || !enemy.alive) return;
     isBattling = true;
 
     const result = calcChance(player, enemy);
@@ -660,13 +711,8 @@ html,body{
     battleText.textContent = `勝率 ${result.percent}%`;
     log("戦闘！");
 
-    setTimeout(() => {
-      battleText.textContent = "ボコ ボコ";
-    }, 160);
-
-    setTimeout(() => {
-      battleText.textContent = "ボコスカ！";
-    }, 320);
+    setTimeout(() => battleText.textContent = "ボコ ボコ", 160);
+    setTimeout(() => battleText.textContent = "ボコスカ！", 320);
 
     setTimeout(() => {
       battleLeft.classList.remove("shakeL");
@@ -688,11 +734,12 @@ html,body{
         setTimeout(() => {
           overlay.classList.remove("show");
           battleBox.classList.remove("flashWin");
-          log(stageKills >= PER_STAGE ? `第${stage}面 クリア！` : "勝利！");
           cleanupDead();
+          followAI();
           nextStageCheck();
           isBattling = false;
           renderAll();
+          if (stageKills < PER_STAGE) log("勝利！");
         }, 420);
 
       } else {
@@ -718,9 +765,10 @@ html,body{
             return;
           }
           ensureSelectedAlive();
-          log(`${player.label}が倒れた…`);
+          followAI();
           isBattling = false;
           renderAll();
+          log(`${player.label}が倒れた…`);
         }, 520);
       }
     }, 760);
@@ -766,18 +814,16 @@ html,body{
   }
 
   app.addEventListener("click", (e) => {
-    const tappedUnit = e.target.closest(".unit");
-    if (tappedUnit) return;
-    const tappedControl = e.target.closest(".ctrlBtn");
-    if (tappedControl) return;
+    if (e.target.closest(".unit")) return;
+    if (e.target.closest(".ctrlBtn")) return;
     moveSelectedByTap(e.clientX, e.clientY);
   });
 
   app.addEventListener("touchend", (e) => {
-    const t = e.changedTouches[0];
-    if (!t) return;
     if (e.target.closest(".unit")) return;
     if (e.target.closest(".ctrlBtn")) return;
+    const t = e.changedTouches[0];
+    if (!t) return;
     moveSelectedByTap(t.clientX, t.clientY);
   }, {passive:true});
 
