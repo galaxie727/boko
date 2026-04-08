@@ -2,804 +2,168 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<title>ボコスカ風 パズル戦争 試作</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>パズル戦争 v2</title>
+
 <style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{
-  margin:0;width:100%;height:100%;overflow:hidden;
-  background:#111722;color:#fff;
-  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+body{
+  margin:0;
+  background:#111;
+  color:#fff;
+  font-family:sans-serif;
 }
-#app{
-  position:relative;width:100vw;height:100vh;overflow:hidden;
-  background:
-    linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px),
-    #1b2430;
-  background-size:48px 48px;
+
+#grid{
+  display:grid;
+  grid-template-columns:repeat(8,1fr);
+  grid-template-rows:repeat(10,1fr);
+  height:100vh;
 }
-.panel{
-  position:absolute;left:10px;right:10px;
-  background:rgba(0,0,0,.45);
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:14px;
-  backdrop-filter:blur(6px);
-  padding:8px 12px;
-  z-index:20;
+
+.cell{
+  border:1px solid rgba(255,255,255,.1);
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
-#topPanel{top:10px;font-size:14px;line-height:1.6;pointer-events:none}
-#logPanel{top:90px;font-size:14px;font-weight:700;pointer-events:none;min-height:40px}
-#bottomPanel{bottom:10px;z-index:20}
-#partyInfo{font-size:13px;line-height:1.65;margin-bottom:8px}
-#controls{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
-.pickBtn{
-  min-width:64px;height:48px;border:none;border-radius:12px;
-  background:#e5e7eb;color:#111;font-size:16px;font-weight:800;
+
+.unit{
+  width:90%;
+  height:90%;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:bold;
 }
-.pickBtn.active{outline:3px solid rgba(255,255,255,.35)}
-.unit,.enemy,.rescue{
-  position:absolute;
-  width:54px;height:54px;border-radius:14px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:22px;font-weight:900;
-  color:#fff;border:2px solid rgba(255,255,255,.58);
-  box-shadow:0 6px 16px rgba(0,0,0,.35);
-  transition:left .1s linear, top .1s linear, transform .1s linear, opacity .18s linear;
-  user-select:none;
-}
-.unit.king{background:#f59e0b;color:#2b1700}
-.unit.melee{background:#3b82f6}
-.unit.archer{background:#10b981}
-.unit.shield{background:#8b5cf6}
-.enemy.enemyMelee{background:#ef4444}
-.enemy.enemyArcher{background:#d946ef}
-.enemy.enemyBoss{background:#b91c1c}
-.rescue{background:#64748b;border-style:dashed}
+
+.king{background:#f59e0b}
+.melee{background:#3b82f6}
+.archer{background:#10b981}
+.shield{background:#8b5cf6}
+.enemy{background:#ef4444}
+
+.move{background:rgba(255,255,255,.2)}
+.attack{background:rgba(255,0,0,.2)}
+
 .selected{
-  box-shadow:0 0 0 4px rgba(255,255,255,.22),0 0 20px rgba(255,255,255,.35);
-  transform:scale(1.06);
+  outline:3px solid #fff;
 }
-.dead{opacity:0;transform:scale(.7)}
-.hit{transform:scale(1.12)}
-.weakened::before{
-  content:"↓";
-  position:absolute;left:-4px;top:-8px;
-  font-size:18px;font-weight:900;color:#facc15;
-  text-shadow:0 0 8px rgba(0,0,0,.7);
-}
-.archerMark::after{
-  content:"";
-  position:absolute;right:-3px;top:-3px;width:14px;height:14px;border-radius:50%;
-  background:#facc15;border:2px solid rgba(0,0,0,.35);
-}
-.turnUsed{
-  filter:saturate(.4) brightness(.82);
-}
-#moveMarks{
-  position:absolute;inset:0;z-index:9;pointer-events:none;
-}
-.moveMark{
-  position:absolute;width:54px;height:54px;border-radius:14px;
-  border:2px dashed rgba(255,255,255,.55);
-  background:rgba(255,255,255,.08);
-}
-#battleOverlay{
-  position:absolute;inset:0;background:rgba(0,0,0,.72);
-  display:none;align-items:center;justify-content:center;z-index:30;
-}
-#battleOverlay.show{display:flex}
-.battleBox{
-  width:min(84vw,340px);
-  border-radius:18px;border:2px solid rgba(255,255,255,.25);
-  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
-  padding:16px 14px 14px;
-  box-shadow:0 10px 32px rgba(0,0,0,.45);
-}
-.battleTitle{font-size:18px;font-weight:900;margin-bottom:10px}
-.battleStage{position:relative;height:110px}
-.fighter{
-  position:absolute;top:22px;width:64px;height:64px;border-radius:16px;
-  border:2px solid rgba(255,255,255,.55);
-  display:flex;align-items:center;justify-content:center;
-  font-size:28px;font-weight:900;
-}
-.fighter.left{left:24px}
-.fighter.right{right:24px}
-.fighter.shakeL{animation:shakeL .12s linear infinite}
-.fighter.shakeR{animation:shakeR .12s linear infinite}
-@keyframes shakeL{0%{transform:translateX(0)}25%{transform:translateX(7px)}50%{transform:translateX(2px)}75%{transform:translateX(9px)}100%{transform:translateX(0)}}
-@keyframes shakeR{0%{transform:translateX(0)}25%{transform:translateX(-7px)}50%{transform:translateX(-2px)}75%{transform:translateX(-9px)}100%{transform:translateX(0)}}
-#battleText{
-  margin-top:4px;min-height:34px;font-size:24px;font-weight:900;letter-spacing:.08em;text-align:center;
-}
-.flashWin{animation:flashWin .4s ease 1}
-.flashLose{animation:flashLose .4s ease 1}
-@keyframes flashWin{0%{box-shadow:0 0 0 rgba(34,197,94,0)}50%{box-shadow:0 0 26px rgba(34,197,94,.9)}100%{box-shadow:0 0 0 rgba(34,197,94,0)}}
-@keyframes flashLose{0%{box-shadow:0 0 0 rgba(239,68,68,0)}50%{box-shadow:0 0 26px rgba(239,68,68,.9)}100%{box-shadow:0 0 0 rgba(239,68,68,0)}}
-.fxShot{
-  position:absolute;width:18px;height:18px;border-radius:50%;
-  background:#facc15;box-shadow:0 0 14px rgba(250,204,21,.85);
-  pointer-events:none;z-index:18;animation:fxShot .3s ease forwards;
-}
-@keyframes fxShot{0%{transform:scale(.3);opacity:0}35%{transform:scale(1);opacity:1}100%{transform:scale(1.2) translateY(-10px);opacity:0}}
-.small{opacity:.85;font-size:12px}
 </style>
 </head>
+
 <body>
-<div id="app">
-  <div id="topPanel" class="panel"></div>
-  <div id="logPanel" class="panel">キャラをタップで選択 → 白いマスをタップで1マス移動</div>
-  <div id="moveMarks"></div>
 
-  <div id="battleOverlay">
-    <div class="battleBox" id="battleBox">
-      <div class="battleTitle">戦闘</div>
-      <div class="battleStage">
-        <div class="fighter left" id="battleLeft"></div>
-        <div class="fighter right" id="battleRight"></div>
-      </div>
-      <div id="battleText">…</div>
-    </div>
-  </div>
-
-  <div id="bottomPanel" class="panel">
-    <div id="partyInfo"></div>
-    <div id="controls"></div>
-  </div>
-</div>
+<div id="grid"></div>
 
 <script>
-(() => {
-  const app = document.getElementById("app");
-  const topPanel = document.getElementById("topPanel");
-  const logPanel = document.getElementById("logPanel");
-  const partyInfo = document.getElementById("partyInfo");
-  const controls = document.getElementById("controls");
-  const moveMarks = document.getElementById("moveMarks");
-  const overlay = document.getElementById("battleOverlay");
-  const battleBox = document.getElementById("battleBox");
-  const battleLeft = document.getElementById("battleLeft");
-  const battleRight = document.getElementById("battleRight");
-  const battleText = document.getElementById("battleText");
+const W=8,H=10;
 
-  const SIZE = 54;
-  const STEP = 48;
-  const HALF = SIZE / 2;
-  const PAD = 8;
-  const TOP_LIMIT = 144;
-  const BOTTOM_LIMIT = 126;
-  const STAGES = 10;
-  const PER_STAGE = 10;
-  const ENEMY_TOTAL = STAGES * PER_STAGE;
+let selected=null;
 
-  let stage = 1;
-  let stageKills = 0;
-  let totalKills = 0;
-  let isBattling = false;
-  let rescueCounter = 0;
-  let selectedIndex = 0;
+const units=[
+  {id:1,type:"king",x:1,y:8,move:3,range:1,power:20},
+  {id:2,type:"melee",x:2,y:8,move:4,range:1,power:12},
+  {id:3,type:"archer",x:3,y:8,move:3,range:3,power:8},
+  {id:4,type:"shield",x:4,y:8,move:2,range:1,power:10},
+];
 
-  const party = [
-    {id:"king", type:"king", label:"王", x:56,  y:560, power:20, wins:0, alive:true, debuff:0, acted:false, el:null},
-    {id:"m1",   type:"melee",label:"兵", x:120, y:560, power:12, wins:0, alive:true, debuff:0, acted:false, el:null},
-    {id:"a1",   type:"archer",label:"弓", x:184, y:560, power:8,  wins:0, alive:true, debuff:0, acted:false, el:null},
-    {id:"s1",   type:"shield",label:"盾", x:248, y:560, power:10, wins:0, alive:true, debuff:0, acted:false, el:null},
-  ];
+let enemies=[
+  {id:101,type:"enemy",x:3,y:2,power:10},
+  {id:102,type:"enemy",x:5,y:3,power:10},
+  {id:103,type:"enemy",x:2,y:4,power:10},
+];
 
-  let enemies = [];
-  let rescues = [];
+const grid=document.getElementById("grid");
 
-  function maxX(){ return app.clientWidth - SIZE - PAD; }
-  function maxY(){ return app.clientHeight - SIZE - BOTTOM_LIMIT; }
-  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-  function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
-  function distance(a,b){
-    return Math.hypot((a.x + HALF) - (b.x + HALF), (a.y + HALF) - (b.y + HALF));
-  }
-  function grid(v){ return Math.round(v / STEP) * STEP; }
+function draw(){
+  grid.innerHTML="";
 
-  function log(text){ logPanel.textContent = text; }
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const cell=document.createElement("div");
+      cell.className="cell";
 
-  function livingParty(){ return party.filter(u => u.alive); }
-  function livingEnemies(){ return enemies.filter(e => e.alive); }
+      let u=units.find(u=>u.x===x&&u.y===y);
+      let e=enemies.find(e=>e.x===x&&e.y===y);
 
-  function iconForUnit(u){
-    if (u.type === "king") return u.wins >= 3 ? "将" : "王";
-    if (u.type === "melee") return u.wins >= 3 ? "強" : "兵";
-    if (u.type === "archer") return u.wins >= 3 ? "豪" : "弓";
-    if (u.type === "shield") return u.wins >= 3 ? "鉄" : "盾";
-    return u.label;
-  }
+      if(u){
+        const div=document.createElement("div");
+        div.className="unit "+u.type+(selected===u?" selected":"");
+        div.textContent=u.type[0];
 
-  function enemyStats(type){
-    if (type === "enemyMelee") return {type, label:"敵", className:"enemy enemyMelee", power:9};
-    if (type === "enemyArcher") return {type, label:"弓", className:"enemy enemyArcher", power:8};
-    if (type === "enemyBoss") return {type, label:"王", className:"enemy enemyBoss", power:18};
-    return {type:"enemyMelee", label:"敵", className:"enemy enemyMelee", power:9};
-  }
+        div.onclick=()=>{
+          selected=u;
+          draw();
+          showRange(u);
+        };
 
-  function enemyConfig(stageNum){
-    if (stageNum <= 3) return ["enemyMelee","enemyMelee","enemyMelee","enemyMelee","enemyMelee","enemyMelee","enemyMelee","enemyArcher","enemyMelee","enemyMelee"];
-    if (stageNum <= 6) return ["enemyMelee","enemyMelee","enemyArcher","enemyMelee","enemyArcher","enemyMelee","enemyMelee","enemyArcher","enemyMelee","enemyMelee"];
-    if (stageNum <= 9) return ["enemyMelee","enemyArcher","enemyMelee","enemyArcher","enemyMelee","enemyArcher","enemyMelee","enemyMelee","enemyArcher","enemyMelee"];
-    return ["enemyArcher","enemyMelee","enemyArcher","enemyMelee","enemyArcher","enemyMelee","enemyArcher","enemyMelee","enemyMelee","enemyBoss"];
-  }
+        cell.appendChild(div);
+      }
 
-  function safePos(taken, minY=TOP_LIMIT, maxYValue=maxY()){
-    for(let i=0;i<200;i++){
-      const x = clamp(grid(randInt(PAD, maxX())), PAD, maxX());
-      const y = clamp(grid(randInt(minY, maxYValue)), TOP_LIMIT, maxY());
-      const ok = taken.every(p => Math.hypot(p.x - x, p.y - y) >= STEP * 1.1);
-      if(ok) return {x,y};
-    }
-    return {x:PAD, y:minY};
-  }
+      if(e){
+        const div=document.createElement("div");
+        div.className="unit enemy";
+        div.textContent="敵";
+        cell.appendChild(div);
+      }
 
-  function createStage(n){
-    enemies.forEach(e => e.el && e.el.remove());
-    rescues.forEach(r => r.el && r.el.remove());
-    enemies = [];
-    rescues = [];
-    stageKills = 0;
-    clearMoveMarks();
+      cell.dataset.x=x;
+      cell.dataset.y=y;
 
-    const taken = [];
-    livingParty().forEach(u => taken.push({x:u.x,y:u.y}));
+      cell.onclick=()=>{
+        if(!selected)return;
 
-    enemyConfig(n).forEach((t, i) => {
-      const s = enemyStats(t);
-      const pos = safePos(taken, TOP_LIMIT, maxY() - 120);
-      taken.push(pos);
-      enemies.push({
-        id:`e${n}_${i}`, ...s,
-        x:pos.x, y:pos.y,
-        alive:true, debuff:0, el:null
-      });
-    });
+        const dx=Math.abs(x-selected.x);
+        const dy=Math.abs(y-selected.y);
+        const dist=dx+dy;
 
-    if (n <= 8){
-      const rescueType = n % 3 === 1 ? "melee" : (n % 3 === 2 ? "archer" : "shield");
-      const pos = safePos(taken, TOP_LIMIT + 50, maxY() - 80);
-      rescues.push({id:`r${n}`, type:rescueType, x:pos.x, y:pos.y, rescued:false, el:null});
-    }
-
-    party.forEach(u => { if (u.alive) u.acted = false; u.debuff = 0; });
-    selectedIndex = party.findIndex(u => u.alive);
-    renderAll();
-    showMoveMarks();
-    log(`第${n}面 開始`);
-  }
-
-  function ensureSelectedAlive(){
-    if (party[selectedIndex] && party[selectedIndex].alive) return;
-    const idx = party.findIndex(u => u.alive);
-    if (idx >= 0) selectedIndex = idx;
-  }
-
-  function selectedUnit(){
-    ensureSelectedAlive();
-    return party[selectedIndex];
-  }
-
-  function createOrUpdateUnitEl(u, selected){
-    if (!u.el){
-      u.el = document.createElement("div");
-      app.appendChild(u.el);
-      u.el.addEventListener("click", ev => {
-        ev.stopPropagation();
-        ev.preventDefault();
-        const idx = party.findIndex(p => p.id === u.id);
-        if (idx >= 0 && u.alive && !u.acted && !isBattling){
-          selectedIndex = idx;
-          renderAll();
-          showMoveMarks();
-          log(`${iconForUnit(u)}を選択`);
-        }
-      });
-      u.el.addEventListener("touchend", ev => {
-        ev.stopPropagation();
-        ev.preventDefault();
-        const idx = party.findIndex(p => p.id === u.id);
-        if (idx >= 0 && u.alive && !u.acted && !isBattling){
-          selectedIndex = idx;
-          renderAll();
-          showMoveMarks();
-          log(`${iconForUnit(u)}を選択`);
-        }
-      }, {passive:false});
-    }
-    u.el.className = `unit ${u.type}${u.type==="archer" ? " archerMark" : ""}${selected ? " selected" : ""}${u.acted ? " turnUsed" : ""}${u.debuff ? " weakened" : ""}`;
-    u.el.textContent = iconForUnit(u);
-    u.el.style.left = `${u.x}px`;
-    u.el.style.top = `${u.y}px`;
-    u.el.style.display = u.alive ? "flex" : "none";
-  }
-
-  function createOrUpdateEnemyEl(e){
-    if (!e.el){
-      e.el = document.createElement("div");
-      app.appendChild(e.el);
-    }
-    e.el.className = `${e.className}${e.type==="enemyArcher" ? " archerMark" : ""}${e.debuff ? " weakened" : ""}`;
-    e.el.textContent = e.label;
-    e.el.style.left = `${e.x}px`;
-    e.el.style.top = `${e.y}px`;
-    e.el.style.display = e.alive ? "flex" : "none";
-  }
-
-  function createOrUpdateRescueEl(r){
-    if (!r.el){
-      r.el = document.createElement("div");
-      app.appendChild(r.el);
-    }
-    r.el.className = "rescue";
-    r.el.textContent = r.type === "melee" ? "兵" : (r.type === "archer" ? "弓" : "盾");
-    r.el.style.left = `${r.x}px`;
-    r.el.style.top = `${r.y}px`;
-    r.el.style.display = r.rescued ? "none" : "flex";
-  }
-
-  function renderAll(){
-    ensureSelectedAlive();
-    party.forEach((u,i) => createOrUpdateUnitEl(u, i===selectedIndex && u.alive && !u.acted));
-    enemies.forEach(createOrUpdateEnemyEl);
-    rescues.forEach(createOrUpdateRescueEl);
-    renderHud();
-    renderControls();
-  }
-
-  function renderHud(){
-    const alive = livingParty().length;
-    const remain = livingEnemies().length;
-    const actedLeft = party.filter(u => u.alive && !u.acted).length;
-    topPanel.innerHTML = `
-      第${stage}面 / ${STAGES}面<br>
-      今の面: ${stageKills}/${PER_STAGE}体 撃破　総撃破: ${totalKills}/${ENEMY_TOTAL}<br>
-      味方: ${alive}体　敵残り: ${remain}体　残り行動: ${actedLeft}<br>
-      <span class="small">1ターンで1体ずつ動かす / 弓は近くの敵を強く弱体化</span>
-    `;
-    partyInfo.innerHTML = party.map((u,i) => {
-      const head = u.alive && i===selectedIndex && !u.acted ? "▶ " : "";
-      if (!u.alive) return `${u.label}: 死亡`;
-      return `${head}${iconForUnit(u)} / P${u.power} / 勝${u.wins}${u.debuff ? ` / 弱体${u.debuff}` : ""}${u.acted ? " / 行動済" : ""}`;
-    }).join("<br>");
-  }
-
-  function renderControls(){
-    controls.innerHTML = "";
-    party.forEach((u,i) => {
-      const btn = document.createElement("button");
-      btn.className = `pickBtn${i===selectedIndex && u.alive && !u.acted ? " active" : ""}`;
-      btn.textContent = iconForUnit(u);
-      btn.disabled = !u.alive || u.acted;
-      btn.addEventListener("click", ev => {
-        ev.stopPropagation();
-        if (!u.alive || u.acted || isBattling) return;
-        selectedIndex = i;
-        renderAll();
-        showMoveMarks();
-        log(`${iconForUnit(u)}を選択`);
-      });
-      controls.appendChild(btn);
-    });
-  }
-
-  function clearMoveMarks(){
-    moveMarks.innerHTML = "";
-  }
-
-  function occupiedByAlly(x,y, ignoreId=null){
-    return party.some(u => u.alive && u.id !== ignoreId && u.x === x && u.y === y);
-  }
-
-  function showMoveMarks(){
-    clearMoveMarks();
-    const u = selectedUnit();
-    if (!u || u.acted || isBattling) return;
-    const candidates = [
-      {x:u.x, y:u.y - STEP},
-      {x:u.x + STEP, y:u.y},
-      {x:u.x, y:u.y + STEP},
-      {x:u.x - STEP, y:u.y}
-    ];
-    candidates.forEach(c => {
-      if (c.x < PAD || c.x > maxX() || c.y < TOP_LIMIT || c.y > maxY()) return;
-      if (occupiedByAlly(c.x, c.y, u.id)) return;
-      const el = document.createElement("div");
-      el.className = "moveMark";
-      el.style.left = `${c.x}px`;
-      el.style.top = `${c.y}px`;
-      el.dataset.x = c.x;
-      el.dataset.y = c.y;
-      moveMarks.appendChild(el);
-    });
-  }
-
-  function flash(el){
-    if (!el) return;
-    el.classList.remove("hit");
-    void el.offsetWidth;
-    el.classList.add("hit");
-    setTimeout(() => el && el.classList.remove("hit"), 120);
-  }
-
-  function addRescue(type, x, y){
-    rescueCounter += 1;
-    const unit = {
-      id:`rescued_${rescueCounter}`, type, label:type==="melee"?"兵":type==="archer"?"弓":"盾",
-      x:clamp(x + STEP, PAD, maxX()),
-      y:y,
-      power:type==="melee"?12:type==="archer"?8:10,
-      wins:0, alive:true, debuff:0, acted:true, el:null
-    };
-    if (occupiedByAlly(unit.x, unit.y)) unit.x = clamp(unit.x - STEP, PAD, maxX());
-    party.push(unit);
-  }
-
-  function showShotFx(x,y){
-    const fx = document.createElement("div");
-    fx.className = "fxShot";
-    fx.style.left = `${x}px`;
-    fx.style.top = `${y}px`;
-    app.appendChild(fx);
-    setTimeout(() => fx.remove(), 300);
-  }
-
-  function applyFriendlyArcherAura(){
-    let shown = 0;
-    party.filter(u => u.alive && u.type==="archer").forEach(archer => {
-      enemies.filter(e => e.alive).forEach(enemy => {
-        if (distance(archer, enemy) <= STEP * 2.2){
-          const before = enemy.debuff;
-          enemy.debuff = Math.min(enemy.debuff + 5, 10);
-          if (enemy.debuff > before && shown < 2){
-            showShotFx(enemy.x + 18, enemy.y + 6);
-            shown++;
+        // 移動
+        if(dist<=selected.move){
+          const blocked=units.some(u=>u.x===x&&u.y===y);
+          if(!blocked){
+            selected.x=x;
+            selected.y=y;
           }
         }
-      });
-    });
-  }
 
-  function applyEnemyArcherAura(){
-    enemies.filter(e => e.alive && e.type==="enemyArcher").forEach(archer => {
-      party.filter(u => u.alive).forEach(unit => {
-        if (distance(archer, unit) <= STEP * 2.2){
-          unit.debuff = Math.min(unit.debuff + 1, 3);
-        }
-      });
-    });
-  }
-
-  function nearKing(unit){
-    const king = party.find(u => u.alive && u.type === "king");
-    if (!king || king.id === unit.id) return false;
-    return distance(unit, king) <= STEP * 2.1;
-  }
-
-  function calcChance(player, enemy){
-    let p = player.power - player.debuff;
-    let e = enemy.power - enemy.debuff;
-    if (player.type === "shield") e -= 3;
-    if (nearKing(player)) p += 2;
-    p += (livingParty().length - 1) * 0.03;
-    p = Math.max(1, p);
-    e = Math.max(1, e);
-    const chance = p / (p + e);
-    const percent = Math.max(5, Math.min(95, Math.round(chance * 100)));
-    return {chance: percent / 100, percent};
-  }
-
-  function enemyAt(x,y){
-    return enemies.find(e => e.alive && e.x === x && e.y === y);
-  }
-
-  function rescueAt(x,y){
-    return rescues.find(r => !r.rescued && r.x === x && r.y === y);
-  }
-
-  function battle(player, enemy, after){
-    if (isBattling || !player.alive || !enemy.alive) return;
-    isBattling = true;
-
-    const res = calcChance(player, enemy);
-    const win = Math.random() < res.chance;
-
-    battleLeft.className = "fighter left unit " + player.type;
-    battleRight.className = "fighter right " + enemy.className;
-    battleLeft.textContent = iconForUnit(player);
-    battleRight.textContent = enemy.label;
-
-    overlay.classList.add("show");
-    battleLeft.classList.add("shakeL");
-    battleRight.classList.add("shakeR");
-    battleText.textContent = `勝率 ${res.percent}%`;
-
-    setTimeout(() => battleText.textContent = "ボコ ボコ", 160);
-    setTimeout(() => battleText.textContent = "ボコスカ！", 320);
-
-    setTimeout(() => {
-      battleLeft.classList.remove("shakeL");
-      battleRight.classList.remove("shakeR");
-
-      if (win){
-        battleText.textContent = "勝利！";
-        battleBox.classList.remove("flashLose");
-        battleBox.classList.add("flashWin");
-        player.power += 1;
-        player.wins += 1;
-        player.debuff = 0;
-        enemy.alive = false;
-        totalKills += 1;
-        stageKills += 1;
-        if (enemy.el) enemy.el.classList.add("dead");
-
-        setTimeout(() => {
-          overlay.classList.remove("show");
-          battleBox.classList.remove("flashWin");
-          cleanupDead();
-          isBattling = false;
-          after && after(true);
-        }, 420);
-
-      } else {
-        battleText.textContent = "やられた…";
-        battleBox.classList.remove("flashWin");
-        battleBox.classList.add("flashLose");
-        player.alive = false;
-        if (player.el) player.el.classList.add("dead");
-
-        setTimeout(() => {
-          overlay.classList.remove("show");
-          battleBox.classList.remove("flashLose");
-          cleanupDead();
-          isBattling = false;
-          after && after(false);
-        }, 520);
-      }
-    }, 760);
-  }
-
-  function cleanupDead(){
-    enemies.filter(e => !e.alive && e.el).forEach(e => e.el.style.display = "none");
-    party.filter(u => !u.alive && u.el).forEach(u => u.el.style.display = "none");
-  }
-
-  function allPlayersActed(){
-    return party.filter(u => u.alive).every(u => u.acted);
-  }
-
-  function alivePlayerUnits(){
-    return party.filter(u => u.alive);
-  }
-
-  function moveEnemyToward(unit, target){
-    const dx = target.x - unit.x;
-    const dy = target.y - unit.y;
-    let nx = unit.x;
-    let ny = unit.y;
-
-    if (Math.abs(dx) > Math.abs(dy)){
-      nx += dx > 0 ? STEP : -STEP;
-    } else if (dy !== 0){
-      ny += dy > 0 ? STEP : -STEP;
-    }
-
-    nx = clamp(nx, PAD, maxX());
-    ny = clamp(ny, TOP_LIMIT, maxY());
-
-    const blockedByEnemy = enemies.some(e => e.alive && e.id !== unit.id && e.x === nx && e.y === ny);
-    if (!blockedByEnemy){
-      unit.x = nx;
-      unit.y = ny;
-    }
-  }
-
-  function enemyTurn(){
-    if (livingEnemies().length === 0){
-      nextStageCheck();
-      return;
-    }
-
-    applyFriendlyArcherAura();
-    applyEnemyArcherAura();
-    renderAll();
-
-    const activeEnemies = livingEnemies().slice(0, Math.min(3, livingEnemies().length));
-    let idx = 0;
-
-    function step(){
-      if (idx >= activeEnemies.length){
-        party.forEach(u => { if (u.alive) u.acted = false; u.debuff = Math.max(0, u.debuff - 1); });
-        enemies.forEach(e => { if (e.alive) e.debuff = Math.max(0, e.debuff - 2); });
-        renderAll();
-        showMoveMarks();
-        log("あなたのターン");
-        return;
-      }
-
-      const enemy = activeEnemies[idx++];
-      if (!enemy.alive){
-        step();
-        return;
-      }
-
-      const targets = alivePlayerUnits();
-      if (!targets.length){
-        alert("全滅…ゲームオーバー");
-        resetGame();
-        return;
-      }
-
-      let best = targets[0];
-      let bestD = distance(enemy, best);
-      targets.forEach(t => {
-        const d = distance(enemy, t);
-        if (d < bestD){ best = t; bestD = d; }
-      });
-
-      moveEnemyToward(enemy, best);
-      renderAll();
-
-      if (enemy.x === best.x && enemy.y === best.y){
-        battle(best, enemy, (playerWon) => {
-          if (!playerWon && best.type === "king"){
-            alert("王が倒れた…ゲームオーバー");
-            resetGame();
-            return;
+        // 攻撃
+        enemies=enemies.filter(e=>{
+          const d=Math.abs(e.x-selected.x)+Math.abs(e.y-selected.y);
+          if(d<=selected.range){
+            if(selected.power>=e.power)return false;
           }
-          if (!alivePlayerUnits().length){
-            alert("全滅…ゲームオーバー");
-            resetGame();
-            return;
-          }
-          renderAll();
-          setTimeout(step, 180);
+          return true;
         });
-      } else {
-        setTimeout(step, 180);
-      }
-    }
 
-    log("敵のターン");
-    setTimeout(step, 180);
-  }
+        selected=null;
+        draw();
+      };
 
-  function nextStageCheck(){
-    if (stageKills < PER_STAGE){
-      enemyTurn();
-      return;
-    }
-    if (stage >= STAGES){
-      alert(`クリア！ 総撃破 ${totalKills}/${ENEMY_TOTAL}`);
-      return;
-    }
-    stage += 1;
-    setTimeout(() => createStage(stage), 180);
-  }
-
-  function attemptMoveTo(x,y){
-    if (isBattling) return;
-    const u = selectedUnit();
-    if (!u || u.acted) return;
-
-    x = clamp(grid(x), PAD, maxX());
-    y = clamp(grid(y), TOP_LIMIT, maxY());
-
-    const dx = x - u.x;
-    const dy = y - u.y;
-    const isOneStep = (Math.abs(dx) === STEP && dy === 0) || (Math.abs(dy) === STEP && dx === 0);
-    if (!isOneStep) return;
-    if (occupiedByAlly(x,y,u.id)) return;
-
-    const rescue = rescueAt(x,y);
-    const enemy = enemyAt(x,y);
-
-    u.x = x;
-    u.y = y;
-    u.acted = true;
-    flash(u.el);
-
-    if (rescue){
-      rescue.rescued = true;
-      addRescue(rescue.type, rescue.x, rescue.y);
-      log("仲間を助けた！");
-    }
-
-    applyFriendlyArcherAura();
-    applyEnemyArcherAura();
-    renderAll();
-    clearMoveMarks();
-
-    if (enemy){
-      battle(u, enemy, (playerWon) => {
-        if (!playerWon && u.type === "king"){
-          alert("王が倒れた…ゲームオーバー");
-          resetGame();
-          return;
-        }
-        if (!livingParty().length){
-          alert("全滅…ゲームオーバー");
-          resetGame();
-          return;
-        }
-        renderAll();
-        if (livingEnemies().length === 0 || allPlayersActed()){
-          nextStageCheck();
-        } else {
-          showMoveMarks();
-          log("次の味方を動かす");
-        }
-      });
-    } else {
-      if (livingEnemies().length === 0 || allPlayersActed()){
-        nextStageCheck();
-      } else {
-        showMoveMarks();
-        log("次の味方を動かす");
-      }
+      grid.appendChild(cell);
     }
   }
+}
 
-  function resetGame(){
-    stage = 1;
-    stageKills = 0;
-    totalKills = 0;
-    rescueCounter = 0;
-    selectedIndex = 0;
-    isBattling = false;
-    overlay.classList.remove("show");
+function showRange(u){
+  const cells=document.querySelectorAll(".cell");
+  cells.forEach(c=>{
+    const x=+c.dataset.x;
+    const y=+c.dataset.y;
 
-    party.splice(4);
-    party[0] = {id:"king", type:"king", label:"王", x:56,  y:560, power:20, wins:0, alive:true, debuff:0, acted:false, el:null};
-    party[1] = {id:"m1",   type:"melee",label:"兵", x:120, y:560, power:12, wins:0, alive:true, debuff:0, acted:false, el:null};
-    party[2] = {id:"a1",   type:"archer",label:"弓", x:184, y:560, power:8,  wins:0, alive:true, debuff:0, acted:false, el:null};
-    party[3] = {id:"s1",   type:"shield",label:"盾", x:248, y:560, power:10, wins:0, alive:true, debuff:0, acted:false, el:null};
+    const dist=Math.abs(x-u.x)+Math.abs(y-u.y);
 
-    party.forEach(u => { if (u.el) u.el.remove(); u.el = null; });
-    enemies.forEach(e => e.el && e.el.remove());
-    rescues.forEach(r => r.el && r.el.remove());
-    enemies = [];
-    rescues = [];
-    createStage(stage);
-  }
-
-  app.addEventListener("click", e => {
-    const moveMark = e.target.closest(".moveMark");
-    if (moveMark){
-      attemptMoveTo(Number(moveMark.dataset.x), Number(moveMark.dataset.y));
-      return;
+    if(dist<=u.move){
+      c.classList.add("move");
+    }
+    if(dist<=u.range){
+      c.classList.add("attack");
     }
   });
+}
 
-  app.addEventListener("touchend", e => {
-    const moveMark = e.target.closest(".moveMark");
-    if (moveMark){
-      e.preventDefault();
-      attemptMoveTo(Number(moveMark.dataset.x), Number(moveMark.dataset.y));
-    }
-  }, {passive:false});
-
-  window.addEventListener("resize", () => {
-    party.forEach(u => {
-      u.x = clamp(grid(u.x), PAD, maxX());
-      u.y = clamp(grid(u.y), TOP_LIMIT, maxY());
-    });
-    enemies.forEach(e => {
-      e.x = clamp(grid(e.x), PAD, maxX());
-      e.y = clamp(grid(e.y), TOP_LIMIT, maxY());
-    });
-    rescues.forEach(r => {
-      r.x = clamp(grid(r.x), PAD, maxX());
-      r.y = clamp(grid(r.y), TOP_LIMIT, maxY());
-    });
-    renderAll();
-    showMoveMarks();
-  });
-
-  createStage(stage);
-})();
+draw();
 </script>
+
 </body>
 </html>
