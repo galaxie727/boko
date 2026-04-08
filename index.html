@@ -5,63 +5,71 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ボコスカ試作</title>
 <style>
-*{box-sizing:border-box}
 body{
   margin:0;
   background:#000;
   color:#fff;
-  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
   text-align:center;
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
 }
 .wrap{
   width:min(92vw,420px);
   margin:0 auto;
   padding:20px 0 40px;
 }
-h1{
+h2{
   margin:10px 0 18px;
   font-size:28px;
-  font-weight:800;
 }
 #game{
   width:100%;
   aspect-ratio:3/5;
-  position:relative;
+  margin:0 auto;
   background:#222;
-  border:3px solid #666;
+  position:relative;
+  border:2px solid #555;
   overflow:hidden;
 }
-#player, #enemy{
-  width:48px;
-  height:48px;
-  border-radius:12px;
+.ground{
   position:absolute;
+  left:0;
+  right:0;
+  bottom:18px;
+  height:2px;
+  background:rgba(255,255,255,.15);
+}
+#player,#enemy{
+  width:56px;
+  height:56px;
+  position:absolute;
+  bottom:20px;
+  border-radius:14px;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:20px;
-  font-weight:700;
+  font-weight:bold;
+  font-size:26px;
+  color:#fff;
   border:2px solid rgba(255,255,255,.55);
+  box-shadow:0 6px 16px rgba(0,0,0,.35);
 }
 #player{
   background:#22c55e;
-  bottom:20px;
   left:20px;
 }
 #enemy{
   background:#ef4444;
-  top:20px;
-  left:200px;
+  left:220px;
 }
 #log{
   margin:16px auto 8px;
-  min-height:24px;
+  min-height:28px;
   font-size:18px;
   font-weight:700;
 }
 #info{
   font-size:18px;
-  line-height:1.8;
+  line-height:1.9;
   margin-bottom:14px;
 }
 .ctrl{
@@ -70,22 +78,31 @@ h1{
   gap:18px;
 }
 button{
-  width:74px;
-  height:60px;
+  width:78px;
+  height:62px;
   border:none;
   border-radius:14px;
   font-size:28px;
   background:#e5e7eb;
   color:#111;
 }
+button:active{
+  transform:scale(.97);
+}
+.sub{
+  margin-top:10px;
+  color:#aaa;
+  font-size:14px;
+}
 </style>
 </head>
 <body>
 
 <div class="wrap">
-  <h1>ボコスカ試作</h1>
+  <h2>ボコスカ試作</h2>
 
   <div id="game">
+    <div class="ground"></div>
     <div id="player">王</div>
     <div id="enemy">敵</div>
   </div>
@@ -102,9 +119,15 @@ button{
     <button onclick="move(-1)">←</button>
     <button onclick="move(1)">→</button>
   </div>
+
+  <div class="sub">同じ地面でぶつかると戦闘</div>
 </div>
 
 <script>
+const GAME_MIN_X = 12;
+const STEP = 24;
+const SIZE = 56;
+
 let player = {
   x: 20,
   power: 50,
@@ -113,10 +136,26 @@ let player = {
 
 let enemy = spawnEnemy();
 
+function maxX(){
+  const game = document.getElementById("game");
+  return Math.max(GAME_MIN_X, game.clientWidth - SIZE - 12);
+}
+
+function clamp(v, min, max){
+  return Math.max(min, Math.min(max, v));
+}
+
 function spawnEnemy(){
   return {
-    x: Math.random()*260,
-    power: 30 + Math.random()*40
+    x: 220,
+    power: Math.floor(30 + Math.random() * 41)
+  };
+}
+
+function respawnEnemy(){
+  enemy = {
+    x: Math.floor(Math.random() * (maxX() - GAME_MIN_X + 1)) + GAME_MIN_X,
+    power: Math.floor(30 + Math.random() * 41)
   };
 }
 
@@ -124,29 +163,35 @@ function update(){
   document.getElementById("player").style.left = player.x + "px";
   document.getElementById("enemy").style.left = enemy.x + "px";
 
+  document.getElementById("player").innerText = player.wins >= 3 ? "将" : "王";
+
   document.getElementById("power").innerText = Math.floor(player.power);
   document.getElementById("wins").innerText = player.wins;
 }
 
 function move(dir){
-  player.x += dir * 20;
+  player.x += dir * STEP;
+  player.x = clamp(player.x, GAME_MIN_X, maxX());
 
-  if(player.x < 0) player.x = 0;
-  if(player.x > 260) player.x = 260;
-
-  checkBattle();
   update();
+  checkBattle();
 }
 
 function checkBattle(){
-  if(Math.abs(player.x - enemy.x) < 30){
+  const distance = Math.abs(player.x - enemy.x);
+
+  if(distance < 42){
     battle();
+  } else {
+    const rate = Math.floor(player.power / (player.power + enemy.power) * 100);
+    document.getElementById("rate").innerText = rate + "%";
+    document.getElementById("log").innerText = "敵に近づけ";
   }
 }
 
 function battle(){
-  let rate = player.power / (player.power + enemy.power);
-  let percent = Math.floor(rate * 100);
+  const rate = player.power / (player.power + enemy.power);
+  const percent = Math.floor(rate * 100);
 
   document.getElementById("rate").innerText = percent + "%";
   document.getElementById("log").innerText = "戦闘！";
@@ -156,23 +201,51 @@ function battle(){
       player.power += 10;
       player.wins += 1;
 
-      if(player.wins >= 3){
-        document.getElementById("player").innerText = "将";
-      }
+      document.getElementById("log").innerText =
+        player.wins === 3 ? "3連勝！ 進化した！" : "勝利！";
 
-      document.getElementById("log").innerText = "勝利！";
-      enemy = spawnEnemy();
+      respawnEnemy();
+      update();
+
+      setTimeout(() => {
+        document.getElementById("rate").innerText = "-";
+        document.getElementById("log").innerText = "敵に近づけ";
+      }, 250);
     } else {
-      alert("ゲームオーバー");
-      location.reload();
+      document.getElementById("log").innerText = "やられた…";
+      setTimeout(() => {
+        alert("ゲームオーバー");
+        resetGame();
+      }, 150);
     }
-
-    document.getElementById("rate").innerText = "-";
-    update();
-  }, 100);
+  }, 120);
 }
 
+function resetGame(){
+  player = {
+    x: 20,
+    power: 50,
+    wins: 0
+  };
+  enemy = spawnEnemy();
+  document.getElementById("rate").innerText = "-";
+  document.getElementById("log").innerText = "敵に近づけ";
+  update();
+}
+
+window.addEventListener("resize", () => {
+  player.x = clamp(player.x, GAME_MIN_X, maxX());
+  enemy.x = clamp(enemy.x, GAME_MIN_X, maxX());
+  update();
+});
+
+enemy = {
+  x: 220,
+  power: Math.floor(30 + Math.random() * 41)
+};
+
 update();
+checkBattle();
 </script>
 
 </body>
