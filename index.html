@@ -1,1 +1,130 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ボコスカ試作</title>
+<style>
+body{
+  margin:0;
+  background:#111;
+  color:#fff;
+  font-family:sans-serif;
+  text-align:center;
+}
+#game{
+  width:320px;
+  height:480px;
+  margin:20px auto;
+  position:relative;
+  background:#222;
+  border:2px solid #555;
+}
+.char{
+  width:40px;
+  height:40px;
+  position:absolute;
+  border-radius:8px;
+}
+.player{background:#4caf50;}
+.enemy{background:#f44336;}
 
+#info{
+  margin-top:10px;
+  font-size:14px;
+}
+
+button{
+  margin:5px;
+  padding:10px 20px;
+  font-size:16px;
+}
+</style>
+</head>
+<body>
+
+<h2>ボコスカ試作</h2>
+
+<div id="game"></div>
+
+<div id="info">
+  勝率: -<br>
+  パワー: 50
+</div>
+
+<div>
+  <button onclick="move(-1)">←</button>
+  <button onclick="move(1)">→</button>
+</div>
+
+<script>
+const game = document.getElementById("game");
+const info = document.getElementById("info");
+
+let player = {
+  x:140,
+  power:50
+};
+
+let enemy = spawnEnemy();
+
+function spawnEnemy(){
+  return {
+    x: Math.random()260,
+    power: 30 + Math.random()40
+  };
+}
+
+function draw(){
+  game.innerHTML="";
+
+  const p = document.createElement("div");
+  p.className="char player";
+  p.style.left = player.x+"px";
+  p.style.bottom = "20px";
+  game.appendChild(p);
+
+  const e = document.createElement("div");
+  e.className="char enemy";
+  e.style.left = enemy.x+"px";
+  e.style.top = "20px";
+  game.appendChild(e);
+}
+
+function move(dir){
+  player.x += dir20;
+  if(player.x<0) player.x=0;
+  if(player.x>280) player.x=280;
+
+  checkBattle();
+  draw();
+}
+
+function checkBattle(){
+  if(Math.abs(player.x - enemy.x) < 30){
+    battle();
+  }
+}
+
+function battle(){
+  let winRate = player.power / (player.power + enemy.power);
+
+  let percent = Math.floor(winRate100);
+
+  info.innerHTML = "勝率: "+percent+"%<br>パワー:"+Math.floor(player.power);
+
+  if(Math.random() < winRate){
+    // 勝利
+    player.power += 10;
+    enemy = spawnEnemy();
+  }else{
+    alert("やられた…");
+    location.reload();
+  }
+}
+
+draw();
+</script>
+
+</body>
+</html>
