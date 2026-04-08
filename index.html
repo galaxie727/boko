@@ -1,432 +1,133 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ボコスカ試作</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>チー娘移動テスト</title>
+
 <style>
-*{box-sizing:border-box}
 body{
   margin:0;
-  background:#000;
+  background:#111;
   color:#fff;
-  text-align:center;
-  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+  font-family:sans-serif;
 }
-.wrap{
-  width:min(92vw,420px);
-  margin:0 auto;
-  padding:20px 0 40px;
-}
-h2{
-  margin:10px 0 18px;
-  font-size:28px;
-}
+
 #game{
-  width:100%;
-  aspect-ratio:3/5;
-  margin:0 auto;
-  background:#222;
   position:relative;
-  border:2px solid #555;
+  width:100vw;
+  height:100vh;
   overflow:hidden;
+  background:#222;
 }
-.ground{
+
+/* キャラ */
+.chara{
   position:absolute;
-  left:0;
-  right:0;
-  bottom:18px;
-  height:2px;
-  background:rgba(255,255,255,.15);
+  width:60px;
+  height:60px;
+  border-radius:12px;
+  text-align:center;
+  line-height:60px;
+  font-weight:bold;
 }
-#player,#enemy{
-  width:56px;
-  height:56px;
+
+.c1{background:#ff6666;}
+.c2{background:#66ccff;}
+.c3{background:#66ff99;}
+.c4{background:#ffcc66;}
+
+.active{
+  outline:4px solid #fff;
+}
+
+/* UI */
+#ui{
   position:absolute;
   bottom:20px;
-  border-radius:14px;
+  left:50%;
+  transform:translateX(-50%);
   display:flex;
-  align-items:center;
-  justify-content:center;
-  font-weight:bold;
-  font-size:26px;
-  color:#fff;
-  border:2px solid rgba(255,255,255,.55);
-  box-shadow:0 6px 16px rgba(0,0,0,.35);
-  transition:left .08s linear, transform .08s linear, opacity .18s linear;
-}
-#player{
-  background:#22c55e;
-  left:20px;
-}
-#enemy{
-  background:#ef4444;
-  left:220px;
-}
-.hit{
-  transform:scale(1.08);
-  filter:brightness(1.15);
-}
-.dead{
-  opacity:0;
-  transform:scale(.7);
+  gap:10px;
 }
 
-#battleOverlay{
-  position:absolute;
-  inset:0;
-  background:rgba(0,0,0,.72);
-  display:none;
-  align-items:center;
-  justify-content:center;
-  z-index:20;
-}
-#battleOverlay.show{
-  display:flex;
-}
-.battleBox{
-  width:min(84%,320px);
-  border:2px solid rgba(255,255,255,.35);
-  border-radius:18px;
-  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
-  padding:18px 14px 16px;
-  box-shadow:0 10px 30px rgba(0,0,0,.45);
-}
-.battleTitle{
-  font-weight:800;
-  font-size:20px;
-  margin-bottom:12px;
-}
-.battleStage{
-  position:relative;
-  height:110px;
-  margin-bottom:10px;
-}
-.fighter{
-  width:64px;
-  height:64px;
-  border-radius:16px;
-  position:absolute;
-  top:22px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:30px;
-  font-weight:800;
-  border:2px solid rgba(255,255,255,.5);
-  color:#fff;
-}
-.fighter.player{
-  background:#22c55e;
-  left:24px;
-}
-.fighter.enemy{
-  background:#ef4444;
-  right:24px;
-}
-.fighter.shakeL{
-  animation:shakeL .12s linear infinite;
-}
-.fighter.shakeR{
-  animation:shakeR .12s linear infinite;
-}
-@keyframes shakeL{
-  0%{transform:translateX(0)}
-  25%{transform:translateX(7px)}
-  50%{transform:translateX(1px)}
-  75%{transform:translateX(9px)}
-  100%{transform:translateX(0)}
-}
-@keyframes shakeR{
-  0%{transform:translateX(0)}
-  25%{transform:translateX(-7px)}
-  50%{transform:translateX(-1px)}
-  75%{transform:translateX(-9px)}
-  100%{transform:translateX(0)}
-}
-#battleText{
-  font-size:26px;
-  font-weight:900;
-  letter-spacing:.08em;
-  min-height:38px;
-}
-.flashWin{
-  animation:flashWin .35s ease 1;
-}
-.flashLose{
-  animation:flashLose .35s ease 1;
-}
-@keyframes flashWin{
-  0%{box-shadow:0 0 0 rgba(34,197,94,0)}
-  50%{box-shadow:0 0 26px rgba(34,197,94,.85)}
-  100%{box-shadow:0 0 0 rgba(34,197,94,0)}
-}
-@keyframes flashLose{
-  0%{box-shadow:0 0 0 rgba(239,68,68,0)}
-  50%{box-shadow:0 0 26px rgba(239,68,68,.85)}
-  100%{box-shadow:0 0 0 rgba(239,68,68,0)}
-}
-
-#log{
-  margin:16px auto 8px;
-  min-height:28px;
-  font-size:18px;
-  font-weight:700;
-}
-#info{
-  font-size:18px;
-  line-height:1.9;
-  margin-bottom:14px;
-}
-.ctrl{
-  display:flex;
-  justify-content:center;
-  gap:18px;
-}
 button{
-  width:78px;
-  height:62px;
-  border:none;
-  border-radius:14px;
-  font-size:28px;
-  background:#e5e7eb;
-  color:#111;
-}
-button:active{
-  transform:scale(.97);
-}
-.sub{
-  margin-top:10px;
-  color:#aaa;
-  font-size:14px;
+  padding:10px 15px;
+  font-size:16px;
 }
 </style>
 </head>
+
 <body>
 
-<div class="wrap">
-  <h2>ボコスカ試作</h2>
+<div id="game">
+  <div class="chara c1 active" id="c1">A</div>
+  <div class="chara c2" id="c2">B</div>
+  <div class="chara c3" id="c3">C</div>
+  <div class="chara c4" id="c4">D</div>
 
-  <div id="game">
-    <div class="ground"></div>
-
-    <div id="player">王</div>
-    <div id="enemy">敵</div>
-
-    <div id="battleOverlay">
-      <div class="battleBox" id="battleBox">
-        <div class="battleTitle">戦闘</div>
-        <div class="battleStage">
-          <div class="fighter player" id="battlePlayer">王</div>
-          <div class="fighter enemy" id="battleEnemy">敵</div>
-        </div>
-        <div id="battleText">…</div>
-      </div>
-    </div>
+  <div id="ui">
+    <button onclick="selectChara(0)">A</button>
+    <button onclick="selectChara(1)">B</button>
+    <button onclick="selectChara(2)">C</button>
+    <button onclick="selectChara(3)">D</button>
   </div>
-
-  <div id="log">敵に近づけ</div>
-
-  <div id="info">
-    勝率: <span id="rate">-</span><br>
-    パワー: <span id="power">50</span><br>
-    勝利数: <span id="wins">0</span>
-  </div>
-
-  <div class="ctrl">
-    <button onclick="move(-1)">←</button>
-    <button onclick="move(1)">→</button>
-  </div>
-
-  <div class="sub">同じ地面でぶつかると戦闘演出</div>
 </div>
 
 <script>
-const GAME_MIN_X = 12;
-const STEP = 24;
-const SIZE = 56;
 
-let isBattling = false;
+const chars = [
+  {el:document.getElementById("c1"), x:100, y:100},
+  {el:document.getElementById("c2"), x:200, y:100},
+  {el:document.getElementById("c3"), x:300, y:100},
+  {el:document.getElementById("c4"), x:400, y:100},
+];
 
-let player = {
-  x: 20,
-  power: 50,
-  wins: 0
-};
+let active = 0;
 
-let enemy = spawnEnemy();
-
-function maxX(){
-  const game = document.getElementById("game");
-  return Math.max(GAME_MIN_X, game.clientWidth - SIZE - 12);
+function selectChara(i){
+  chars[active].el.classList.remove("active");
+  active = i;
+  chars[active].el.classList.add("active");
 }
 
-function clamp(v, min, max){
-  return Math.max(min, Math.min(max, v));
-}
-
-function spawnEnemy(){
-  return {
-    x: 220,
-    power: Math.floor(30 + Math.random() * 41)
-  };
-}
-
-function respawnEnemy(){
-  enemy = {
-    x: Math.floor(Math.random() * (maxX() - GAME_MIN_X + 1)) + GAME_MIN_X,
-    power: Math.floor(30 + Math.random() * 41)
-  };
-}
-
+/* 初期配置 */
 function update(){
-  const playerEl = document.getElementById("player");
-  const enemyEl = document.getElementById("enemy");
-
-  playerEl.style.left = player.x + "px";
-  enemyEl.style.left = enemy.x + "px";
-
-  playerEl.innerText = player.wins >= 3 ? "将" : "王";
-
-  document.getElementById("power").innerText = Math.floor(player.power);
-  document.getElementById("wins").innerText = player.wins;
-
-  document.getElementById("battlePlayer").innerText = player.wins >= 3 ? "将" : "王";
-  document.getElementById("battleEnemy").innerText = "敵";
+  chars.forEach(c=>{
+    c.el.style.left = c.x+"px";
+    c.el.style.top = c.y+"px";
+  });
 }
+update();
 
-function move(dir){
-  if(isBattling) return;
+/* 移動 */
+const speed = 5;
 
-  player.x += dir * STEP;
-  player.x = clamp(player.x, GAME_MIN_X, maxX());
+document.addEventListener("keydown", e=>{
+  let c = chars[active];
 
-  update();
-  checkBattle();
-}
-
-function checkBattle(){
-  const distance = Math.abs(player.x - enemy.x);
-
-  if(distance < 42){
-    battle();
-  } else {
-    const rate = Math.floor(player.power / (player.power + enemy.power) * 100);
-    document.getElementById("rate").innerText = rate + "%";
-    document.getElementById("log").innerText = "敵に近づけ";
+  if(e.key === "ArrowUp" || e.key === "w"){
+    c.y -= speed;
   }
-}
+  if(e.key === "ArrowDown" || e.key === "s"){
+    c.y += speed;
+  }
+  if(e.key === "ArrowLeft" || e.key === "a"){
+    c.x -= speed;
+  }
+  if(e.key === "ArrowRight" || e.key === "d"){
+    c.x += speed;
+  }
 
-function battle(){
-  if(isBattling) return;
-  isBattling = true;
+  /* 仲間切替 */
+  if(e.key === "1") selectChara(0);
+  if(e.key === "2") selectChara(1);
+  if(e.key === "3") selectChara(2);
+  if(e.key === "4") selectChara(3);
 
-  const rate = player.power / (player.power + enemy.power);
-  const percent = Math.floor(rate * 100);
-
-  const overlay = document.getElementById("battleOverlay");
-  const battleText = document.getElementById("battleText");
-  const battlePlayer = document.getElementById("battlePlayer");
-  const battleEnemy = document.getElementById("battleEnemy");
-  const battleBox = document.getElementById("battleBox");
-  const playerEl = document.getElementById("player");
-  const enemyEl = document.getElementById("enemy");
-
-  document.getElementById("rate").innerText = percent + "%";
-  document.getElementById("log").innerText = "戦闘！";
-
-  playerEl.classList.add("hit");
-  enemyEl.classList.add("hit");
-
-  overlay.classList.add("show");
-  battlePlayer.classList.add("shakeL");
-  battleEnemy.classList.add("shakeR");
-  battleText.innerText = "ボコ  ボコ";
-
-  setTimeout(() => {
-    battleText.innerText = "ボコスカ！";
-  }, 220);
-
-  setTimeout(() => {
-    const win = Math.random() < rate;
-
-    battlePlayer.classList.remove("shakeL");
-    battleEnemy.classList.remove("shakeR");
-
-    if(win){
-      battleText.innerText = "勝利！";
-      battleBox.classList.remove("flashLose");
-      battleBox.classList.add("flashWin");
-
-      player.power += 10;
-      player.wins += 1;
-
-      enemyEl.classList.add("dead");
-
-      setTimeout(() => {
-        respawnEnemy();
-        enemyEl.classList.remove("dead");
-        battleBox.classList.remove("flashWin");
-        overlay.classList.remove("show");
-
-        document.getElementById("log").innerText =
-          player.wins === 3 ? "3連勝！ 進化した！" : "勝利！";
-
-        document.getElementById("rate").innerText = "-";
-        playerEl.classList.remove("hit");
-        enemyEl.classList.remove("hit");
-
-        update();
-        isBattling = false;
-      }, 420);
-
-    } else {
-      battleText.innerText = "やられた…";
-      battleBox.classList.remove("flashWin");
-      battleBox.classList.add("flashLose");
-
-      playerEl.classList.add("dead");
-
-      setTimeout(() => {
-        overlay.classList.remove("show");
-        battleBox.classList.remove("flashLose");
-        alert("ゲームオーバー");
-        resetGame();
-      }, 520);
-    }
-  }, 720);
-}
-
-function resetGame(){
-  const playerEl = document.getElementById("player");
-  const enemyEl = document.getElementById("enemy");
-
-  player = {
-    x: 20,
-    power: 50,
-    wins: 0
-  };
-  enemy = spawnEnemy();
-
-  playerEl.classList.remove("dead", "hit");
-  enemyEl.classList.remove("dead", "hit");
-
-  document.getElementById("battleOverlay").classList.remove("show");
-  document.getElementById("rate").innerText = "-";
-  document.getElementById("log").innerText = "敵に近づけ";
-
-  update();
-  isBattling = false;
-}
-
-window.addEventListener("resize", () => {
-  player.x = clamp(player.x, GAME_MIN_X, maxX());
-  enemy.x = clamp(enemy.x, GAME_MIN_X, maxX());
   update();
 });
 
-update();
-checkBattle();
 </script>
 
 </body>
