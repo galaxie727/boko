@@ -2,168 +2,358 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>パズル戦争 v2</title>
-
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>パズル戦争 v2 fix</title>
 <style>
-body{
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{
   margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
   background:#111;
   color:#fff;
-  font-family:sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
 }
-
-#grid{
-  display:grid;
-  grid-template-columns:repeat(8,1fr);
-  grid-template-rows:repeat(10,1fr);
+#app{
+  position:relative;
+  width:100vw;
   height:100vh;
+  overflow:hidden;
+  background:
+    linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px),
+    #0f172a;
 }
-
+#top{
+  position:absolute;
+  left:10px; right:10px; top:10px;
+  z-index:20;
+  background:rgba(0,0,0,.45);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;
+  padding:8px 12px;
+  backdrop-filter:blur(6px);
+  font-size:14px;
+  line-height:1.6;
+  pointer-events:none;
+}
+#log{
+  margin-top:8px;
+  font-weight:700;
+  min-height:22px;
+}
+#board{
+  position:absolute;
+  inset:0;
+}
 .cell{
-  border:1px solid rgba(255,255,255,.1);
+  position:absolute;
+  border:1px solid rgba(255,255,255,.08);
+}
+.unit,.enemy,.mark{
+  position:absolute;
+  border-radius:14px;
   display:flex;
   align-items:center;
   justify-content:center;
+  font-weight:900;
+  user-select:none;
 }
-
-.unit{
-  width:90%;
-  height:90%;
-  border-radius:10px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-weight:bold;
+.unit,.enemy{
+  color:#fff;
+  border:2px solid rgba(255,255,255,.55);
+  box-shadow:0 6px 16px rgba(0,0,0,.35);
+  z-index:10;
 }
-
-.king{background:#f59e0b}
-.melee{background:#3b82f6}
-.archer{background:#10b981}
-.shield{background:#8b5cf6}
+.unit.king{background:#f59e0b;color:#2b1700}
+.unit.melee{background:#3b82f6}
+.unit.archer{background:#10b981}
+.unit.shield{background:#8b5cf6}
 .enemy{background:#ef4444}
-
-.move{background:rgba(255,255,255,.2)}
-.attack{background:rgba(255,0,0,.2)}
-
 .selected{
-  outline:3px solid #fff;
+  box-shadow:0 0 0 4px rgba(255,255,255,.25),0 0 18px rgba(255,255,255,.35);
+  transform:scale(1.05);
 }
+.mark{
+  background:rgba(255,255,255,.10);
+  border:2px dashed rgba(255,255,255,.55);
+  z-index:5;
+}
+#bottom{
+  position:absolute;
+  left:10px; right:10px; bottom:10px;
+  z-index:20;
+  background:rgba(0,0,0,.45);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;
+  padding:8px 12px;
+  backdrop-filter:blur(6px);
+  font-size:13px;
+  line-height:1.6;
+}
+#buttons{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:8px;
+}
+.pick{
+  min-width:64px;
+  height:44px;
+  border:none;
+  border-radius:12px;
+  background:#e5e7eb;
+  color:#111;
+  font-size:16px;
+  font-weight:800;
+}
+.pick.active{outline:3px solid rgba(255,255,255,.35)}
 </style>
 </head>
-
 <body>
-
-<div id="grid"></div>
+<div id="app">
+  <div id="top">
+    <div id="info"></div>
+    <div id="log">キャラをタップして選択 → 白いマスをタップで移動</div>
+  </div>
+  <div id="board"></div>
+  <div id="bottom">
+    <div id="party"></div>
+    <div id="buttons"></div>
+  </div>
+</div>
 
 <script>
-const W=8,H=10;
+(() => {
+  const COLS = 8;
+  const ROWS = 10;
+  const CELL = Math.floor(window.innerWidth / COLS);
+  const BOARD_TOP = Math.max(120, CELL * 1.7);
+  const BOARD_BOTTOM_PAD = 150;
+  const UNIT_SIZE = CELL - 10;
 
-let selected=null;
+  const app = document.getElementById("app");
+  const board = document.getElementById("board");
+  const infoEl = document.getElementById("info");
+  const logEl = document.getElementById("log");
+  const partyEl = document.getElementById("party");
+  const buttonsEl = document.getElementById("buttons");
 
-const units=[
-  {id:1,type:"king",x:1,y:8,move:3,range:1,power:20},
-  {id:2,type:"melee",x:2,y:8,move:4,range:1,power:12},
-  {id:3,type:"archer",x:3,y:8,move:3,range:3,power:8},
-  {id:4,type:"shield",x:4,y:8,move:2,range:1,power:10},
-];
+  let selectedId = "king";
+  let acted = new Set();
 
-let enemies=[
-  {id:101,type:"enemy",x:3,y:2,power:10},
-  {id:102,type:"enemy",x:5,y:3,power:10},
-  {id:103,type:"enemy",x:2,y:4,power:10},
-];
+  const party = [
+    {id:"king", type:"king", label:"王", x:1, y:8, move:3, range:1, power:20, wins:0, alive:true},
+    {id:"m1", type:"melee", label:"兵", x:2, y:8, move:4, range:1, power:12, wins:0, alive:true},
+    {id:"a1", type:"archer", label:"弓", x:3, y:8, move:3, range:3, power:8, wins:0, alive:true},
+    {id:"s1", type:"shield", label:"盾", x:4, y:8, move:2, range:1, power:10, wins:0, alive:true},
+  ];
 
-const grid=document.getElementById("grid");
+  let enemies = [
+    {id:"e1", x:3, y:1, power:10, alive:true},
+    {id:"e2", x:5, y:2, power:10, alive:true},
+    {id:"e3", x:2, y:3, power:10, alive:true},
+  ];
 
-function draw(){
-  grid.innerHTML="";
+  function icon(u){
+    if (u.type === "king") return "王";
+    if (u.type === "melee") return "兵";
+    if (u.type === "archer") return "弓";
+    if (u.type === "shield") return "盾";
+    return "?";
+  }
 
-  for(let y=0;y<H;y++){
-    for(let x=0;x<W;x++){
-      const cell=document.createElement("div");
-      cell.className="cell";
+  function getUnit(id){ return party.find(u => u.id === id && u.alive); }
+  function getSelected(){ return getUnit(selectedId); }
+  function enemyAt(x,y){ return enemies.find(e => e.alive && e.x===x && e.y===y); }
+  function allyAt(x,y,ignoreId=null){ return party.find(u => u.alive && u.id!==ignoreId && u.x===x && u.y===y); }
 
-      let u=units.find(u=>u.x===x&&u.y===y);
-      let e=enemies.find(e=>e.x===x&&e.y===y);
+  function posLeft(x){ return x * CELL + 5; }
+  function posTop(y){ return BOARD_TOP + y * CELL + 5; }
 
-      if(u){
-        const div=document.createElement("div");
-        div.className="unit "+u.type+(selected===u?" selected":"");
-        div.textContent=u.type[0];
+  function canMoveTo(unit, x, y){
+    if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return false;
+    const dist = Math.abs(unit.x - x) + Math.abs(unit.y - y);
+    if (dist === 0 || dist > unit.move) return false;
+    if (allyAt(x, y, unit.id)) return false;
+    return true;
+  }
 
-        div.onclick=()=>{
-          selected=u;
-          draw();
-          showRange(u);
-        };
+  function showMoveMarks(){
+    [...board.querySelectorAll(".mark")].forEach(el => el.remove());
+    const unit = getSelected();
+    if (!unit || acted.has(unit.id)) return;
 
-        cell.appendChild(div);
+    for(let y=0;y<ROWS;y++){
+      for(let x=0;x<COLS;x++){
+        if(!canMoveTo(unit, x, y)) continue;
+        const el = document.createElement("div");
+        el.className = "mark";
+        el.style.left = posLeft(x) + "px";
+        el.style.top = posTop(y) + "px";
+        el.style.width = UNIT_SIZE + "px";
+        el.style.height = UNIT_SIZE + "px";
+        el.dataset.x = x;
+        el.dataset.y = y;
+        board.appendChild(el);
       }
-
-      if(e){
-        const div=document.createElement("div");
-        div.className="unit enemy";
-        div.textContent="敵";
-        cell.appendChild(div);
-      }
-
-      cell.dataset.x=x;
-      cell.dataset.y=y;
-
-      cell.onclick=()=>{
-        if(!selected)return;
-
-        const dx=Math.abs(x-selected.x);
-        const dy=Math.abs(y-selected.y);
-        const dist=dx+dy;
-
-        // 移動
-        if(dist<=selected.move){
-          const blocked=units.some(u=>u.x===x&&u.y===y);
-          if(!blocked){
-            selected.x=x;
-            selected.y=y;
-          }
-        }
-
-        // 攻撃
-        enemies=enemies.filter(e=>{
-          const d=Math.abs(e.x-selected.x)+Math.abs(e.y-selected.y);
-          if(d<=selected.range){
-            if(selected.power>=e.power)return false;
-          }
-          return true;
-        });
-
-        selected=null;
-        draw();
-      };
-
-      grid.appendChild(cell);
     }
   }
-}
 
-function showRange(u){
-  const cells=document.querySelectorAll(".cell");
-  cells.forEach(c=>{
-    const x=+c.dataset.x;
-    const y=+c.dataset.y;
-
-    const dist=Math.abs(x-u.x)+Math.abs(y-u.y);
-
-    if(dist<=u.move){
-      c.classList.add("move");
+  function drawGrid(){
+    [...board.querySelectorAll(".cell")].forEach(el => el.remove());
+    board.style.top = "0";
+    for(let y=0;y<ROWS;y++){
+      for(let x=0;x<COLS;x++){
+        const el = document.createElement("div");
+        el.className = "cell";
+        el.style.left = (x*CELL) + "px";
+        el.style.top = (BOARD_TOP + y*CELL) + "px";
+        el.style.width = CELL + "px";
+        el.style.height = CELL + "px";
+        board.appendChild(el);
+      }
     }
-    if(dist<=u.range){
-      c.classList.add("attack");
+  }
+
+  function drawUnits(){
+    [...board.querySelectorAll(".unit,.enemy")].forEach(el => el.remove());
+
+    party.filter(u=>u.alive).forEach(u => {
+      const el = document.createElement("div");
+      el.className = `unit ${u.type}${u.id===selectedId ? " selected" : ""}`;
+      el.textContent = icon(u);
+      el.style.left = posLeft(u.x) + "px";
+      el.style.top = posTop(u.y) + "px";
+      el.style.width = UNIT_SIZE + "px";
+      el.style.height = UNIT_SIZE + "px";
+      el.style.fontSize = Math.floor(UNIT_SIZE*0.45) + "px";
+      el.dataset.id = u.id;
+      board.appendChild(el);
+    });
+
+    enemies.filter(e=>e.alive).forEach(e => {
+      const el = document.createElement("div");
+      el.className = "enemy";
+      el.textContent = "敵";
+      el.style.left = posLeft(e.x) + "px";
+      el.style.top = posTop(e.y) + "px";
+      el.style.width = UNIT_SIZE + "px";
+      el.style.height = UNIT_SIZE + "px";
+      el.style.fontSize = Math.floor(UNIT_SIZE*0.42) + "px";
+      board.appendChild(el);
+    });
+  }
+
+  function drawHud(){
+    const aliveEnemies = enemies.filter(e=>e.alive).length;
+    const aliveParty = party.filter(u=>u.alive).length;
+    infoEl.textContent = `味方:${aliveParty}　敵:${aliveEnemies}　残り行動:${party.filter(u=>u.alive && !acted.has(u.id)).length}`;
+    partyEl.innerHTML = party.map(u => {
+      const mark = u.id===selectedId && u.alive && !acted.has(u.id) ? "▶ " : "";
+      const state = !u.alive ? "死亡" : (acted.has(u.id) ? "行動済" : "未行動");
+      return `${mark}${icon(u)} / P${u.power} / 勝${u.wins} / ${state}`;
+    }).join("<br>");
+
+    buttonsEl.innerHTML = "";
+    party.forEach(u => {
+      const btn = document.createElement("button");
+      btn.className = `pick${u.id===selectedId && u.alive && !acted.has(u.id) ? " active" : ""}`;
+      btn.textContent = icon(u);
+      btn.disabled = !u.alive || acted.has(u.id);
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!u.alive || acted.has(u.id)) return;
+        selectedId = u.id;
+        render();
+        logEl.textContent = `${icon(u)}を選択`;
+      });
+      buttonsEl.appendChild(btn);
+    });
+  }
+
+  function resolveBattle(unit){
+    const targets = enemies.filter(e => e.alive).filter(e => {
+      const dist = Math.abs(unit.x - e.x) + Math.abs(unit.y - e.y);
+      return dist <= unit.range;
+    });
+    if (!targets.length) return;
+
+    targets.sort((a,b) => (Math.abs(unit.x-a.x)+Math.abs(unit.y-a.y)) - (Math.abs(unit.x-b.x)+Math.abs(unit.y-b.y)));
+    const target = targets[0];
+
+    const chance = Math.max(5, Math.min(95, Math.round((unit.power / (unit.power + target.power)) * 100)));
+    if (Math.random() < chance / 100){
+      target.alive = false;
+      unit.wins += 1;
+      unit.power += 1;
+      logEl.textContent = `${icon(unit)}が敵を撃破 (${chance}%)`;
+    } else {
+      unit.alive = false;
+      logEl.textContent = `${icon(unit)}がやられた… (${chance}%)`;
+      if (unit.type === "king"){
+        setTimeout(() => {
+          alert("王が倒れた…ゲームオーバー");
+        }, 50);
+      }
+    }
+  }
+
+  function endTurnCheck(){
+    const remaining = party.filter(u=>u.alive && !acted.has(u.id));
+    if (remaining.length){
+      selectedId = remaining[0].id;
+      render();
+      return;
+    }
+    logEl.textContent = "全員行動終了。仮の敵ターンは未実装";
+    acted = new Set();
+    const first = party.find(u=>u.alive);
+    if (first) selectedId = first.id;
+    render();
+  }
+
+  function moveSelectedTo(x, y){
+    const unit = getSelected();
+    if (!unit || acted.has(unit.id)) return;
+    if (!canMoveTo(unit, x, y)) return;
+
+    unit.x = x;
+    unit.y = y;
+    acted.add(unit.id);
+    resolveBattle(unit);
+    endTurnCheck();
+  }
+
+  board.addEventListener("click", (e) => {
+    const unitEl = e.target.closest(".unit");
+    if (unitEl){
+      const id = unitEl.dataset.id;
+      const unit = getUnit(id);
+      if (unit && !acted.has(id)){
+        selectedId = id;
+        render();
+        logEl.textContent = `${icon(unit)}を選択`;
+      }
+      return;
+    }
+
+    const markEl = e.target.closest(".mark");
+    if (markEl){
+      moveSelectedTo(Number(markEl.dataset.x), Number(markEl.dataset.y));
     }
   });
-}
 
-draw();
+  function render(){
+    drawGrid();
+    drawUnits();
+    drawHud();
+    showMoveMarks();
+  }
+
+  render();
+})();
 </script>
-
 </body>
 </html>
